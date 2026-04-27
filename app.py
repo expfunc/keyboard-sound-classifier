@@ -23,21 +23,40 @@ except Exception as exc:
     st.error(f"Model artifacts were not found or could not be loaded: {exc}")
     st.stop()
 
-uploaded_file = st.file_uploader("Upload a WAV file", type=["wav"])
+st.subheader("Audio Source")
+source_mode = st.radio(
+    "Choose how to provide audio",
+    options=["Record from microphone", "Upload WAV file"],
+    horizontal=True,
+)
 
-if uploaded_file is not None:
+audio_source = None
+if source_mode == "Record from microphone":
+    audio_input = getattr(st, "audio_input", None)
+    if audio_input is None:
+        st.error("This Streamlit version does not support microphone recording. Use WAV upload instead.")
+        st.stop()
+    st.caption("Use the microphone widget below to start and stop recording.")
+    audio_source = audio_input("Record from your microphone", sample_rate=22_050)
+else:
+    audio_source = st.file_uploader("Upload a WAV file", type=["wav"])
+
+if audio_source is not None:
     try:
-        audio, sample_rate = sf.read(io.BytesIO(uploaded_file.getvalue()), dtype="float32")
+        audio_bytes = audio_source.getvalue()
+        audio, sample_rate = sf.read(io.BytesIO(audio_bytes), dtype="float32")
     except Exception as exc:
-        st.error(f"Could not read uploaded audio: {exc}")
+        st.error(f"Could not read audio: {exc}")
         st.stop()
 
     if np.size(audio) == 0:
-        st.error("Uploaded file is empty.")
+        st.error("Recorded or uploaded audio is empty.")
         st.stop()
 
     if np.ndim(audio) > 1:
         audio = np.mean(audio, axis=1)
+
+    st.audio(audio_bytes, format="audio/wav")
 
     try:
         prediction = predict_click_sequence(
