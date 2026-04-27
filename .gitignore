@@ -1,0 +1,10 @@
+.venv/
+keyboard-sound-classifier_venv/
+.idea/
+__pycache__/
+*.py[cod]
+
+data/
+
+models/*.joblib
+models/*.keras

@@ -1,0 +1,10 @@
+numpy
+pandas
+librosa
+sounddevice
+soundfile
+scikit-learn
+matplotlib
+joblib
+streamlit
+tensorflow-cpu

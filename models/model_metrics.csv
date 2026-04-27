@@ -1,0 +1,5 @@
+model,model_type,accuracy,macro_f1
+RandomForest,sklearn,1.0,1.0
+SVC,sklearn,1.0,1.0
+KNeighbors,sklearn,1.0,1.0
+MelSpectrogramCNN,cnn,1.0,1.0
