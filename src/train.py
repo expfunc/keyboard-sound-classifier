@@ -30,6 +30,14 @@ from src.config import (
 from src.features import extract_features, extract_mel_spectrogram
 
 
+def artifact_registry_path(file_path: Path) -> str:
+    """Store model paths relative to the project models directory for portable artifacts."""
+    try:
+        return file_path.relative_to(BEST_MODEL_PATH.parent).as_posix()
+    except ValueError:
+        return file_path.name
+
+
 def collect_dataset_entries(processed_dir: str | Path = PROCESSED_DATA_DIR) -> list[tuple[Path, str]]:
     """Collect processed WAV file paths with their labels."""
     processed_root = Path(processed_dir)
@@ -183,7 +191,7 @@ def train_and_select_best(processed_dir: str | Path = PROCESSED_DATA_DIR) -> pd.
         macro_f1 = f1_score(y_test, y_pred, average="macro")
         model_path = candidate_model_path(model_name=model_name, model_type="sklearn")
         joblib.dump(pipeline, model_path)
-        model_registry[model_name] = {"model_type": "sklearn", "path": str(model_path)}
+        model_registry[model_name] = {"model_type": "sklearn", "path": artifact_registry_path(model_path)}
 
         metrics_rows.append(
             {
@@ -232,7 +240,7 @@ def train_and_select_best(processed_dir: str | Path = PROCESSED_DATA_DIR) -> pd.
         macro_f1 = f1_score(y_test, y_pred, average="macro")
         cnn_candidate_path = candidate_model_path(model_name="MelSpectrogramCNN", model_type="cnn")
         cnn_model.save(cnn_candidate_path)
-        model_registry["MelSpectrogramCNN"] = {"model_type": "cnn", "path": str(cnn_candidate_path)}
+        model_registry["MelSpectrogramCNN"] = {"model_type": "cnn", "path": artifact_registry_path(cnn_candidate_path)}
         metrics_rows.append(
             {
                 "model": "MelSpectrogramCNN",

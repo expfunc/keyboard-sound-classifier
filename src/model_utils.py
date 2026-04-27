@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 import joblib
 import numpy as np
@@ -20,17 +20,24 @@ from src.config import (
 
 def _resolve_artifact_path(raw_path: str | Path) -> Path:
     """Resolve artifact paths saved on another machine or OS."""
-    path = Path(raw_path)
+    raw_text = str(raw_path)
+    path = Path(raw_text)
     if path.exists():
         return path
 
-    candidate_names = [path.name]
-    candidate_parent = path.parent.name
-    if candidate_parent:
-        candidate_names.append(f"{candidate_parent}/{path.name}")
+    candidate_names: list[str] = []
+    for parsed_path in (PurePath(raw_text), PurePosixPath(raw_text), PureWindowsPath(raw_text)):
+        if parsed_path.name:
+            candidate_names.append(parsed_path.name)
+        if parsed_path.parent.name and parsed_path.name:
+            candidate_names.append(f"{parsed_path.parent.name}/{parsed_path.name}")
 
+    seen_names: set[str] = set()
     for candidate_name in candidate_names:
         normalized = candidate_name.replace("\\", "/")
+        if normalized in seen_names:
+            continue
+        seen_names.add(normalized)
         if normalized.startswith("candidates/"):
             candidate_path = MODEL_CANDIDATES_DIR / normalized.split("/", maxsplit=1)[1]
         else:
