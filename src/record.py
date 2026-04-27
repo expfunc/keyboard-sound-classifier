@@ -7,10 +7,20 @@ from pathlib import Path
 
 import librosa
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
 
 from src.config import DEFAULT_ALLOWED_LABELS, DEFAULT_RECORD_SECONDS, DEFAULT_SAMPLE_RATE, RAW_DATA_DIR
+
+
+def _load_sounddevice() -> object:
+    """Import sounddevice only for local recording workflows."""
+    try:
+        import sounddevice as sd
+    except OSError as exc:
+        raise RuntimeError(
+            "sounddevice requires the PortAudio system library, which is not available in this environment."
+        ) from exc
+    return sd
 
 
 def choose_label(allowed_labels: list[str]) -> str:
@@ -31,6 +41,7 @@ def choose_label(allowed_labels: list[str]) -> str:
 
 def list_input_devices() -> list[tuple[int, dict]]:
     """Return all available input devices."""
+    sd = _load_sounddevice()
     devices = sd.query_devices()
     input_devices = [
         (index, device_info)
@@ -115,6 +126,7 @@ def record_session_until_clicks_detected(
     block_size: int = 2048,
 ) -> np.ndarray:
     """Record a continuous session and stop after enough clicks are detected."""
+    sd = _load_sounddevice()
     sd.check_input_settings(device=device, samplerate=sample_rate, channels=1)
 
     buffers: list[np.ndarray] = []
