@@ -8,3 +8,9 @@ data/
 
 models/*.joblib
 models/*.keras
+!models/best_model.joblib
+!models/best_cnn_model.keras
+!models/label_encoder.joblib
+!models/model_info.joblib
+!models/model_registry.joblib
+!models/evaluation_data.joblib

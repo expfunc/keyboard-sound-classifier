@@ -8,16 +8,77 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from src.config import BEST_CNN_MODEL_PATH, BEST_MODEL_PATH, LABEL_ENCODER_PATH, MODEL_INFO_PATH
+from src.config import (
+    BEST_CNN_MODEL_PATH,
+    BEST_MODEL_PATH,
+    LABEL_ENCODER_PATH,
+    MODEL_CANDIDATES_DIR,
+    MODEL_INFO_PATH,
+    MODEL_REGISTRY_PATH,
+)
+
+
+def _resolve_artifact_path(raw_path: str | Path) -> Path:
+    """Resolve artifact paths saved on another machine or OS."""
+    path = Path(raw_path)
+    if path.exists():
+        return path
+
+    candidate_names = [path.name]
+    candidate_parent = path.parent.name
+    if candidate_parent:
+        candidate_names.append(f"{candidate_parent}/{path.name}")
+
+    for candidate_name in candidate_names:
+        normalized = candidate_name.replace("\\", "/")
+        if normalized.startswith("candidates/"):
+            candidate_path = MODEL_CANDIDATES_DIR / normalized.split("/", maxsplit=1)[1]
+        else:
+            candidate_path = BEST_MODEL_PATH.parent / normalized
+        if candidate_path.exists():
+            return candidate_path
+
+    return path
+
+
+def _build_fallback_registry() -> dict[str, dict[str, str]]:
+    """Recover a minimal registry when metadata is incomplete."""
+    registry: dict[str, dict[str, str]] = {}
+    if BEST_MODEL_PATH.exists():
+        registry["BestModel"] = {"model_type": "sklearn", "path": str(BEST_MODEL_PATH)}
+    if BEST_CNN_MODEL_PATH.exists():
+        registry["BestCNNModel"] = {"model_type": "cnn", "path": str(BEST_CNN_MODEL_PATH)}
+    return registry
 
 
 def load_model_info() -> dict[str, object]:
     """Load model metadata, with backward-compatible defaults for sklearn-only artifacts."""
     if MODEL_INFO_PATH.exists():
-        return joblib.load(MODEL_INFO_PATH)
+        model_info = dict(joblib.load(MODEL_INFO_PATH))
+        registry = dict(model_info.get("registry", {}))
+        if not registry and MODEL_REGISTRY_PATH.exists():
+            registry = dict(joblib.load(MODEL_REGISTRY_PATH))
+        if not registry:
+            registry = _build_fallback_registry()
+        if registry:
+            model_info["registry"] = registry
+            if "best_model_name" not in model_info:
+                model_info["best_model_name"] = next(iter(registry))
+        return model_info
 
     if BEST_MODEL_PATH.exists():
-        return {"model_type": "sklearn", "best_model_name": "UnknownSklearnModel"}
+        return {
+            "model_type": "sklearn",
+            "best_model_name": "BestModel",
+            "registry": _build_fallback_registry(),
+        }
+
+    if BEST_CNN_MODEL_PATH.exists():
+        return {
+            "model_type": "cnn",
+            "best_model_name": "BestCNNModel",
+            "registry": _build_fallback_registry(),
+        }
 
     raise FileNotFoundError("No saved model metadata found. Train the model first.")
 
@@ -38,7 +99,7 @@ def load_prediction_artifacts(model_name: str | None = None) -> tuple[object, ob
 
     selected_info = dict(registry[selected_model_name])
     model_type = str(selected_info["model_type"])
-    model_path = Path(selected_info["path"])
+    model_path = _resolve_artifact_path(selected_info["path"])
     selected_model_info = dict(model_info)
     selected_model_info["model_type"] = model_type
     selected_model_info["best_model_name"] = selected_model_name
