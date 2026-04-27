@@ -10,6 +10,7 @@ import pandas as pd
 
 from src.features import extract_features, extract_features_from_audio, extract_mel_spectrogram_from_audio
 from src.model_utils import load_prediction_artifacts, predict_probabilities
+from src.record import detect_click_onsets, split_click_recording
 
 
 def predict_feature_vector(
@@ -75,6 +76,60 @@ def predict_audio_array(
         label_encoder=label_encoder,
         model_info=model_info,
     )
+
+
+def predict_click_sequence(
+    audio: np.ndarray,
+    sample_rate: int,
+    model: object,
+    label_encoder: object,
+    model_info: dict[str, object],
+    clip_duration: float = 0.4,
+) -> dict[str, object]:
+    """Predict a sequence of key clicks from one continuous recording."""
+    detected_onsets = detect_click_onsets(audio=audio, sample_rate=sample_rate)
+    detected_clicks = len(detected_onsets)
+    if detected_clicks == 0:
+        raise RuntimeError("No clicks were detected in the uploaded recording.")
+
+    segments = split_click_recording(
+        audio=audio,
+        sample_rate=sample_rate,
+        target_clicks=detected_clicks,
+        clip_duration=clip_duration,
+    )
+
+    predictions: list[dict[str, object]] = []
+    label_counts: dict[str, int] = {}
+    predicted_sequence: list[str] = []
+
+    for index, segment in enumerate(segments, start=1):
+        prediction = predict_audio_array(
+            audio=segment,
+            sample_rate=sample_rate,
+            model=model,
+            label_encoder=label_encoder,
+            model_info=model_info,
+        )
+        label = str(prediction["label"])
+        predicted_sequence.append(label)
+        label_counts[label] = label_counts.get(label, 0) + 1
+        predictions.append(
+            {
+                "index": index,
+                "label": label,
+                "confidence": float(prediction["confidence"]) if "confidence" in prediction else None,
+                "probabilities": prediction.get("probabilities"),
+            }
+        )
+
+    return {
+        "detected_clicks": detected_clicks,
+        "sequence": predicted_sequence,
+        "sequence_text": " ".join(predicted_sequence),
+        "predictions": predictions,
+        "label_counts": label_counts,
+    }
 
 
 def predict_file(audio_path: str | Path) -> dict[str, object]:

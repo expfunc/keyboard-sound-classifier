@@ -10,7 +10,7 @@ import soundfile as sf
 import streamlit as st
 
 from src.model_utils import load_prediction_artifacts
-from src.predict import predict_audio_array
+from src.predict import predict_click_sequence
 
 
 st.set_page_config(page_title="Keyboard Sound Classifier", page_icon="⌨️")
@@ -40,7 +40,7 @@ if uploaded_file is not None:
         audio = np.mean(audio, axis=1)
 
     try:
-        prediction = predict_audio_array(
+        prediction = predict_click_sequence(
             audio=audio,
             sample_rate=sample_rate,
             model=model,
@@ -52,12 +52,31 @@ if uploaded_file is not None:
         st.stop()
 
     st.subheader("Prediction")
-    st.write(f"Predicted key: **{prediction['label']}**")
+    st.write(f"Detected clicks: **{prediction['detected_clicks']}**")
+    st.write(f"Predicted sequence: **{prediction['sequence_text']}**")
 
-    if "probabilities" in prediction:
-        probability_table = prediction["probabilities"]
-        st.write(f"Confidence: **{float(prediction['confidence']):.4f}**")
-        st.bar_chart(pd.Series(probability_table))
+    prediction_rows = pd.DataFrame(prediction["predictions"])
+    if not prediction_rows.empty:
+        display_rows = prediction_rows[["index", "label", "confidence"]].copy()
+        display_rows = display_rows.rename(
+            columns={"index": "Click", "label": "Predicted key", "confidence": "Confidence"}
+        )
+        st.dataframe(display_rows, use_container_width=True, hide_index=True)
+
+    st.subheader("Prediction Counts")
+    st.bar_chart(pd.Series(prediction["label_counts"]).sort_values(ascending=False))
+
+    first_probabilities = next(
+        (
+            item["probabilities"]
+            for item in prediction["predictions"]
+            if item.get("probabilities") is not None
+        ),
+        None,
+    )
+    if first_probabilities is not None:
+        st.subheader("Class Probabilities For First Detected Click")
+        st.bar_chart(pd.Series(first_probabilities))
     else:
         st.info("This model does not expose class probabilities.")
 
