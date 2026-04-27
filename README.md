@@ -210,13 +210,15 @@ python -m src.test_single_label --model-name MelSpectrogramCNN
 
 Запуск:
 
+[Сайт](https://keyboard-sound-classifier-5ciwmtbk4bcgk9nzlgvhnd.streamlit.app/)
+
 ```bash
 streamlit run app.py
 ```
 
 В приложении можно:
 
-- загрузить `.wav` файл;
+- загрузить `.wav` файл или записать напрямую через микрофон;
 - получить предсказанный класс клавиши;
 - увидеть confidence или вероятности классов, если модель их поддерживает.
 
